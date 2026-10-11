@@ -178,7 +178,6 @@
   .parent-block{margin-top:16px;padding-top:16px;border-top:2px dashed var(--parchment-dark);}
   .parent-block h4{margin:0 0 8px;font-family:'Baloo 2';}
   .mini-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
-  .mini-list .row{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:6px 10px;font-weight:700;font-size:.85rem;}
   .mini-list .row{display:flex;align-items:center;gap:8px;background:#fff;border-radius:10px;padding:6px 10px;font-weight:700;font-size:.85rem;flex-wrap:wrap;}
   .mini-list .row input, .mini-list .row select{
     padding:5px 7px;border-radius:8px;border:2px solid var(--parchment-dark);font-family:'Nunito';font-weight:700;font-size:.85rem;
@@ -276,18 +275,11 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 const STORAGE_KEY = 'family-quest-data';
-const SUPABASE_URL =
-  'https://wqgnbqlnwsbbighgobhb.supabase.co';
-
-const SUPABASE_KEY =
-  'sb_publishable_SM58ZBLVBdVxaiSWE_LHLQ_ic8HDwwY';
-
+const SUPABASE_URL = 'https://wqgnbqlnwsbbighgobhb.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_SM58ZBLVBdVxaiSWE_LHLQ_ic8HDwwY';
 const APP_STATE_ID = 'family-quest';
 
-const supabase = window.supabase.createClient(
-  SUPABASE_URL,
-  SUPABASE_KEY
-);
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
 let suppressRealtimeUpdate = false;
 let state = {
@@ -328,7 +320,7 @@ let state = {
 let activeKidId = null;
 let parentMode = false;
 const PARENT_PASSWORD = '86169';
-let leaderboardView = 'overall'; // 'overall' | 'daily'
+let leaderboardView = 'overall';
 let avatarEditorOpenFor = null;
 let teamActivityOpenFor = null;
 const TEAM_BONUS = 1.3;
@@ -341,9 +333,11 @@ function panelHeader(id, titleHtml, extraHtml){
     <div style="display:flex;align-items:center;gap:8px;">${extraHtml||''}<span class="chevron ${isClosed?'closed':''}">▾</span></div>
   </div>`;
 }
+
 function panelBodyClass(id){
   return collapsedPanels[id] ? 'card-body hidden' : 'card-body';
 }
+
 function attachPanelToggles(){
   document.querySelectorAll('[data-toggle-panel]').forEach(el=>{
     el.onclick = (e)=>{
@@ -362,8 +356,10 @@ function thresholdFor(level){
   const lastIdx = LEVEL_THRESHOLDS.length-1;
   return last + (level-lastIdx)*(280 + (level-lastIdx)*40);
 }
+
 const LEVEL_TITLES = ['Waldläufer','Schildknappe','Ritter','Silberschild-Ritter','Drachenfreund','Heldenmeister','Kristallwächter','Sagenschmied','Kronenträger','Legende'];
 function titleFor(level){ return LEVEL_TITLES[Math.min(level-1, LEVEL_TITLES.length-1)] || 'Mythischer Held'; }
+
 const ITEM_EMOJI = ['🥾','🛡️','⚔️','🏹','🐉','👑','🔮','🦄','🏆','⭐'];
 function itemFor(level){ return ITEM_EMOJI[Math.min(level-1, ITEM_EMOJI.length-1)] || '🎁'; }
 
@@ -384,84 +380,45 @@ function displayDateTime(d){
   const dt = new Date(d);
   return dt.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit'}) + ' ' + dt.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
-async function loadFromCloud() {
 
-try {
-
-  const { data, error } = await supabase
-    .from('app_state')
-    .select('*')
-    .eq('id', APP_STATE_ID)
-    .single();
-
-  if (error) {
-  console.error("Cloud Fehler:", error);
-  return true;
-}
-console.log("Cloud geladen:", data);
-
-  if (data && data.state) {
-
-    state = Object.assign(state, data.state);
-
-    if(state.kids.length && !activeKidId){
-      activeKidId = state.kids[0].id;
+async function loadFromCloud(){
+  try {
+    const { data, error } = await supabase.from('app_state').select('*').eq('id', APP_STATE_ID).single();
+    if (error) {
+      console.error("Cloud Fehler:", error);
+      return false;
     }
-
-    return true;
-  }
-
-} catch(err){
-  console.error(err);
+    if (data && data.state) {
+      state = Object.assign(state, data.state);
+      if(state.kids.length && !activeKidId) activeKidId = state.kids[0].id;
+      return true;
+    }
+  } catch(err){ console.error(err); }
+  return false;
 }
 
-return false;
-}
-
-async function saveToCloud() {
-
-try {
-
-  suppressRealtimeUpdate = true;
-
-  const { error } = await supabase
-    .from('app_state')
-    .upsert({
+async function saveToCloud(){
+  try {
+    suppressRealtimeUpdate = true;
+    const { error } = await supabase.from('app_state').upsert({
       id: APP_STATE_ID,
       state: state,
       updated_at: new Date().toISOString()
     });
-
-  if(error){
-    console.error(error);
-  }
-
-  setTimeout(() => {
-    suppressRealtimeUpdate = false;
-  }, 500);
-
-} catch(err){
-  console.error(err);
+    if(error) console.error(error);
+    setTimeout(() => { suppressRealtimeUpdate = false; }, 500);
+  } catch(err){ console.error(err); }
 }
-}
+
 function loadState(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(raw){
       const parsed = JSON.parse(raw);
       state = Object.assign(state, parsed);
-      if(!state.pointRewards) state.pointRewards = parsed.pointRewards || [
-        {id:'pr1', interval:30, emoji:'📺', text:'Medienzeit (15 Min)'},
-      ];
-      if(!state.sanctionTypes) state.sanctionTypes = parsed.sanctionTypes || [
-        {id:'s1', emoji:'⛔', label:'Aufgabe verweigert', kind:'points', value:10},
-        {id:'s2', emoji:'📴', label:'Bildschirmzeit gesperrt', kind:'lock', value:24},
-        {id:'s3', emoji:'🚫', label:'Goodie gestrichen', kind:'goodie', value:0},
-      ];
-      if(!state.pinnedTaskIds) state.pinnedTaskIds = parsed.pinnedTaskIds || [];
-      if(!state.redemptionRequirements) state.redemptionRequirements = parsed.redemptionRequirements || [];
     }
   }catch(e){ console.error('Laden fehlgeschlagen', e); }
+  
   state.goodies.forEach(g=>{ if(g.requirementId === undefined) g.requirementId = null; });
   state.pointRewards.forEach(r=>{ if(r.requirementId === undefined) r.requirementId = null; });
   state.kids.forEach(k=>{
@@ -476,23 +433,10 @@ function loadState(){
 }
 
 async function saveState(){
-
-try{
-
-  localStorage.setItem(
-    STORAGE_KEY,
-    JSON.stringify(state)
-  );
-
-  await saveToCloud();
-
-}catch(e){
-
-  console.error(
-    'Speichern fehlgeschlagen',
-    e
-  );
-}
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    await saveToCloud();
+  }catch(e){ console.error('Speichern fehlgeschlagen', e); }
 }
 
 function addKid(name){
@@ -503,9 +447,6 @@ function addKid(name){
   saveState(); render();
 }
 
-function unpinTask(taskId){
-  state.pinnedTaskIds = state.pinnedTaskIds.filter(id=>id!==taskId);
-}
 function togglePin(taskId){
   if(state.pinnedTaskIds.includes(taskId)){
     state.pinnedTaskIds = state.pinnedTaskIds.filter(id=>id!==taskId);
@@ -518,288 +459,180 @@ function togglePin(taskId){
 function completeTask(kid, task){
   kid.points += task.pts;
   kid.log.unshift({id:'l'+Date.now()+Math.floor(Math.random()*1000), name:task.name, emoji:task.emoji, pts:task.pts, cat:task.cat, taskId:task.id, date: todayISO(), when: displayDate(new Date()), at: new Date().toISOString()});
-  unpinTask(task.id);
+  state.pinnedTaskIds = state.pinnedTaskIds.filter(id=>id!==task.id);
   saveState(); render();
 }
 
-function completeTaskTeam(kid, task, otherKidIds){
-  const others = otherKidIds.map(id=>state.kids.find(k=>k.id===id)).filter(Boolean);
-  const participants = [kid, ...others];
-  const n = participants.length;
-  if(n < 2){ completeTask(kid, task); return; }
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-  const totalPoints = Math.round(task.pts * TEAM_BONUS);
-  const base = Math.floor(totalPoints / n);
-  const remainder = totalPoints - base*n;
-  const nowIso = new Date().toISOString();
-
-  participants.forEach((p, i)=>{
-    const share = base + (i < remainder ? 1 : 0);
-    p.points += share;
-    const teammates = participants.filter(x=>x.id!==p.id).map(x=>x.name);
-    p.log.unshift({
-      id:'l'+Date.now()+Math.floor(Math.random()*10000)+i,
-      name: task.name, emoji: task.emoji, pts: share, cat: task.cat, taskId: task.id,
-      date: todayISO(), when: displayDate(new Date()), at: nowIso,
-      team: teammates
-    });
-  });
-
-  unpinTask(task.id);
-  teamActivityOpenFor = null;
-  saveState(); render();
-}
-
-function pointsTodayInCategory(kid, category){
-  const t = todayISO();
-  return kid.log.filter(l=>l.date===t && l.cat===category).reduce((s,l)=>s+l.pts,0);
-}
-
-function meetsRequirement(kid, requirementId){
-  if(!requirementId) return true;
-  const req = state.redemptionRequirements.find(r=>r.id===requirementId);
-  if(!req) return true;
-  return pointsTodayInCategory(kid, req.category) >= req.minPoints;
-}
-
-function addRedemptionRequirement(label, category, minPoints){
-  state.redemptionRequirements.push({id:'req'+Date.now(), label, category, minPoints});
-  saveState(); render();
-}
-function deleteRedemptionRequirement(id){
-  if(!confirm('Diese Voraussetzung wirklich löschen? Belohnungen, die sie nutzen, verlieren dann ihre Bedingung.')) return;
-  state.redemptionRequirements = state.redemptionRequirements.filter(r=>r.id!==id);
-  state.goodies.forEach(g=>{ if(g.requirementId===id) g.requirementId=null; });
-  state.pointRewards.forEach(r=>{ if(r.requirementId===id) r.requirementId=null; });
-  saveState(); render();
-}
-function updateRequirementField(id, field, value){
-  const r = state.redemptionRequirements.find(x=>x.id===id);
-  if(!r) return;
-  r[field] = (field==='minPoints') ? (parseInt(value)||0) : value;
-  saveState();
-}
-
-function deleteLogEntry(kid, logId){
-  const entry = kid.log.find(l=>l.id===logId);
-  if(!entry) return;
-  if(!confirm(`„${entry.name}" (+${entry.pts} Punkte) wirklich löschen? Die Punkte werden wieder abgezogen.`)) return;
-  kid.points = Math.max(0, kid.points - entry.pts);
-  kid.log = kid.log.filter(l=>l.id!==logId);
-  saveState(); render();
-}
-
-function updateTaskField(id, field, value){
-  const t = state.tasks.find(x=>x.id===id);
-  if(!t) return;
-  t[field] = (field==='pts') ? (parseInt(value)||0) : value;
-  saveState();
-}
-
-function updateGoodieField(id, field, value){
-  const g = state.goodies.find(x=>x.id===id);
-  if(!g) return;
-  if(field==='level') value = parseInt(value)||1;
-  else if(field==='requirementId') value = value || null;
-  g[field] = value;
-  saveState();
-}
-
-function updatePointRewardField(id, field, value){
-  const r = state.pointRewards.find(x=>x.id===id);
-  if(!r) return;
-  if(field==='interval') value = parseInt(value)||1;
-  else if(field==='requirementId') value = value || null;
-  r[field] = value;
-  saveState();
-}
-
-function updateTeamField(id, field, value){
-  const t = state.teams.find(x=>x.id===id);
-  if(!t) return;
-  t[field] = value;
-  saveState(); render();
-}
-
-function updateSanctionTypeField(id, field, value){
-  const s = state.sanctionTypes.find(x=>x.id===id);
-  if(!s) return;
-  s[field] = (field==='value') ? (parseInt(value)||0) : value;
-  saveState();
-  if(field==='kind') render();
-}
-
-function addCustomTask(cat, name, emoji, pts){
-  state.tasks.push({id:'t'+Date.now(), cat, name, emoji: emoji || '⭐', pts});
-  saveState(); render();
-}
-
-function deleteTask(id){
-  if(!confirm('Diese Aufgabe wirklich löschen?')) return;
-  state.tasks = state.tasks.filter(t=>t.id!==id);
-  saveState(); render();
-}
-
-function moveTaskCategory(id, newCat){
-  const t = state.tasks.find(t=>t.id===id);
-  if(t) t.cat = newCat;
-  saveState(); render();
-}
-
-function addCategory(name){
-  if(!name) return;
-  if(!state.categories.includes(name)) state.categories.push(name);
-  saveState(); render();
-}
-
-function addPointReward(interval, emoji, text, requirementId){
-  state.pointRewards.push({id:'pr'+Date.now(), interval, emoji: emoji||'🎁', text, requirementId: requirementId || null});
-  saveState(); render();
-}
-function deletePointReward(id){
-  if(!confirm('Diese Punkte-Belohnung wirklich löschen?')) return;
-  state.pointRewards = state.pointRewards.filter(r=>r.id!==id);
-  saveState(); render();
-}
-function availablePointRewardCount(kid, reward){
-  const earned = Math.floor(kid.points / reward.interval);
-  const redeemed = kid.redeemedPointRewards[reward.id] || 0;
-  return Math.max(0, earned - redeemed);
-}
-function redeemPointReward(kid, rewardId){
-  const reward = state.pointRewards.find(r=>r.id===rewardId);
-  if(!reward) return;
-  if(availablePointRewardCount(kid, reward) <= 0) return;
-  if(!meetsRequirement(kid, reward.requirementId)) return;
-  kid.redeemedPointRewards[rewardId] = (kid.redeemedPointRewards[rewardId] || 0) + 1;
-  kid.pointRewardLog.unshift({id:'pl'+Date.now(), rewardId, emoji: reward.emoji, text: reward.text, at: new Date().toISOString()});
-  saveState(); render();
-}
-
-function unredeemPointReward(kid, logId){
-  const entry = kid.pointRewardLog.find(l=>l.id===logId);
-  if(!entry) return;
-  if(!confirm(`„${entry.text}" wieder als nicht eingelöst markieren? Steht ${escapeHtml(kid.name)} danach wieder zur Verfügung.`)) return;
-  if(kid.redeemedPointRewards[entry.rewardId]){
-    kid.redeemedPointRewards[entry.rewardId] = Math.max(0, kid.redeemedPointRewards[entry.rewardId] - 1);
+function render(){
+  if(!parentMode && !activeKidId && state.kids.length === 0){
+    document.getElementById('mainCol').innerHTML = '<div class="empty">Willkommen bei Family Quest! Klicken Sie auf "Eltern-Modus" um Profile anzulegen.</div>';
+    document.getElementById('sidebarLeft').innerHTML = '';
+    document.getElementById('sidebarRight').innerHTML = '';
+    return;
   }
-  kid.pointRewardLog = kid.pointRewardLog.filter(l=>l.id!==logId);
-  saveState(); render();
-}
-
-function addGoodie(level, emoji, text, requirementId){
-  state.goodies.push({id:'g'+Date.now(), level, emoji: emoji || '🎁', text, requirementId: requirementId || null});
-  saveState(); render();
-}
-function deleteGoodie(id){
-  if(!confirm('Diesen Goodie wirklich löschen?')) return;
-  state.goodies = state.goodies.filter(g=>g.id!==id);
-  saveState(); render();
-}
-
-function redeemGoodie(kid, goodieId){
-  const g = state.goodies.find(x=>x.id===goodieId);
-  if(g && !meetsRequirement(kid, g.requirementId)) return;
-  kid.redeemed[goodieId] = new Date().toISOString();
-  saveState(); render();
-}
-
-function unredeemGoodie(kid, goodieId){
-  const g = state.goodies.find(x=>x.id===goodieId);
-  if(!confirm(`„${g ? g.text : 'Dieser Goodie'}" wieder als nicht eingelöst markieren? Steht ${escapeHtml(kid.name)} danach wieder zur Verfügung.`)) return;
-  delete kid.redeemed[goodieId];
-  saveState(); render();
-}
-
-function addTeam(name, emoji){
-  state.teams.push({id:'team'+Date.now(), name, emoji: emoji || '🚩'});
-  saveState(); render();
-}
-function deleteTeam(id){
-  if(!confirm('Team wirklich löschen? Mitglieder werden dem Team entfernt.')) return;
-  state.teams = state.teams.filter(t=>t.id!==id);
-  state.kids.forEach(k=>{ if(k.teamId===id) k.teamId=null; });
-  saveState(); render();
-}
-function setKidTeam(kid, teamId){
-  kid.teamId = teamId || null;
-  saveState(); render();
-}
-
-function isLocked(kid){
-  return !!(kid.lockedUntil && new Date(kid.lockedUntil) > new Date());
-}
-
-function addSanctionType(emoji, label, kind, value){
-  state.sanctionTypes.push({id:'s'+Date.now(), emoji: emoji||'⚠️', label, kind, value: value||0});
-  saveState(); render();
-}
-function deleteSanctionType(id){
-  if(!confirm('Diese Sanktionsart wirklich löschen?')) return;
-  state.sanctionTypes = state.sanctionTypes.filter(s=>s.id!==id);
-  saveState(); render();
-}
-
-function applySanction(kid, sanctionTypeId, note, goodieId){
-  const st = state.sanctionTypes.find(s=>s.id===sanctionTypeId);
-  if(!st) return;
-  const entry = {
-    id:'sa'+Date.now(), typeId: st.id, emoji: st.emoji, label: st.label, kind: st.kind,
-    value: st.value, note: note || '', appliedAt: new Date().toISOString(), expiresAt: null, goodieId: null
-  };
-  if(st.kind === 'points'){
-    kid.points = Math.max(0, kid.points - st.value);
-  } else if(st.kind === 'lock'){
-    const until = new Date(Date.now() + st.value*60*60*1000);
-    kid.lockedUntil = until.toISOString();
-    entry.expiresAt = kid.lockedUntil;
-  } else if(st.kind === 'goodie'){
-    if(!goodieId) return;
-    if(!kid.blockedGoodieIds.includes(goodieId)) kid.blockedGoodieIds.push(goodieId);
-    if(kid.redeemed[goodieId]) delete kid.redeemed[goodieId];
-    entry.goodieId = goodieId;
-    const g = state.goodies.find(g=>g.id===goodieId);
-    entry.label = st.label + (g ? `: ${g.text}` : '');
+  
+  if(parentMode){
+    renderParentMode();
+  } else if(activeKidId){
+    const kid = state.kids.find(k=>k.id===activeKidId);
+    if(kid) renderKidMode(kid);
   }
-  kid.sanctions.unshift(entry);
-  saveState(); render();
 }
 
-function removeSanction(kid, sanctionId){
-  const entry = kid.sanctions.find(s=>s.id===sanctionId);
-  if(!entry) return;
-  if(!confirm(`Sanktion „${entry.label}" wirklich zurücknehmen?`)) return;
-  if(entry.kind === 'points'){
-    kid.points += entry.value;
-  } else if(entry.kind === 'lock'){
-    if(kid.lockedUntil === entry.expiresAt) kid.lockedUntil = null;
-  } else if(entry.kind === 'goodie' && entry.goodieId){
-    kid.blockedGoodieIds = kid.blockedGoodieIds.filter(id=>id!==entry.goodieId);
-  }
-  kid.sanctions = kid.sanctions.filter(s=>s.id!==sanctionId);
-  saveState(); render();
+function renderKidMode(kid){
+  const level = levelForPoints(kid.points);
+  const nextThreshold = thresholdFor(level);
+  const prevThreshold = thresholdFor(level - 1);
+  const progressPercent = Math.round(((kid.points - prevThreshold) / (nextThreshold - prevThreshold)) * 100);
+  
+  document.getElementById('mainCol').innerHTML = `
+    <div class="card">
+      <div class="questtitle">
+        <div class="who">
+          <div class="av-big">${avatarHtml(kid.avatar, 48)}</div>
+          <div><h2>${escapeHtml(kid.name)}</h2><span class="level-badge">Level ${level}</span></div>
+        </div>
+      </div>
+      ${questPathSVG(level)}
+      <div class="xpbar"><div class="xpfill" style="width:${progressPercent}%"></div></div>
+      <div class="xplabel">${kid.points} / ${nextThreshold} Punkte</div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><h3>✨ Aufgaben</h3></div>
+      <div class="card-body">
+        ${state.categories.map(cat=>`
+          <div style="margin-bottom:12px;">
+            <h4>${escapeHtml(cat)}</h4>
+            <div class="taskgrid">
+              ${state.tasks.filter(t=>t.cat===cat).map(t=>`
+                <div class="task">
+                  <button class="pin-btn ${state.pinnedTaskIds.includes(t.id)?'pinned':''}" data-toggle-pin="${t.id}" title="Zur Ausschreibung">📌</button>
+                  <div class="top"><span class="emoji">${t.emoji}</span><span>${escapeHtml(t.name)}</span></div>
+                  <span class="pts">+${t.pts} Punkte</span>
+                  <button data-task="${t.id}">Erledigt ✓</button>
+                </div>
+              `).join('')}
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title"><h3>🏆 Belohnungen</h3></div>
+      <div class="card-body">
+        ${state.goodies.length ? `<div class="goodie-list">
+          ${state.goodies.map(g=>`
+            <div class="goodie ${kid.redeemed[g.id]?'redeemed':''}">
+              <span class="emoji">${g.emoji}</span>
+              <span class="txt">${escapeHtml(g.text)}</span>
+              <span class="lvl">Level ${g.level}</span>
+              ${!kid.redeemed[g.id] ? `<button data-redeem="${g.id}">Einlösen</button>` : '<span class="when">Eingelöst</span>'}
+            </div>
+          `).join('')}
+        </div>` : '<div class="empty">Keine Belohnungen</div>'}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('sidebarLeft').innerHTML = `
+    <div class="card">
+      <h3>Profile</h3>
+      <div class="kidgrid" id="kidSwitcherGrid"></div>
+    </div>
+  `;
+  renderKidBar();
+
+  document.getElementById('sidebarRight').innerHTML = `
+    <div class="card">
+      <h3>Aktivitäten</h3>
+      <ul class="log">
+        ${kid.log.slice(0,10).map(l=>`
+          <li>
+            <div class="row">
+              <span class="emoji">${l.emoji}</span>
+              <span>${escapeHtml(l.name)} <strong>+${l.pts}</strong></span>
+            </div>
+            <span class="when">${l.when}</span>
+          </li>
+        `).join('')}
+      </ul>
+    </div>
+  `;
+
+  attachEventListeners(kid);
+  attachPanelToggles();
 }
 
-function setAvatarEmoji(kid, emoji){
-  kid.avatar = emoji;
-  avatarEditorOpenFor = null;
-  saveState(); render();
-}
-function setAvatarFile(kid, file){
-  const reader = new FileReader();
-  reader.onload = (e)=>{
-    kid.avatar = e.target.result;
-    avatarEditorOpenFor = null;
-    saveState(); render();
-  };
-  reader.readAsDataURL(file);
+function renderParentMode(){
+  document.getElementById('mainCol').innerHTML = `
+    <div class="card">
+      <h2>Eltern-Modus</h2>
+      <div class="addform">
+        <input type="text" id="newKidName" placeholder="Name des Kindes">
+        <button onclick="addKidFromForm()">+ Kind hinzufügen</button>
+      </div>
+      <div style="margin-top:20px;">
+        <h3>Verwaltung</h3>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+          <button onclick="exportJson()">📥 Exportieren</button>
+          <button onclick="document.getElementById('importJsonInput').click()">📤 Importieren</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Kinder (${state.kids.length})</h3>
+      <div class="mini-list">
+        ${state.kids.map(k=>`
+          <div class="row">
+            <span class="av-big">${avatarHtml(k.avatar,30)}</span>
+            <span class="grow">${escapeHtml(k.name)}</span>
+            <span>${k.points} Punkte</span>
+            <button class="icon-btn" onclick="deleteKidConfirm('${k.id}')">🗑️</button>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  `;
+
+  document.getElementById('sidebarLeft').innerHTML = '';
+  document.getElementById('sidebarRight').innerHTML = '';
+
+  attachEventListeners(null);
+  attachPanelToggles();
 }
 
-function avatarHtml(av, size){
-  if(typeof av === 'string' && av.startsWith('data:')){
-    return `<img src="${av}" style="width:100%;height:100%;object-fit:cover;">`;
-  }
-  return `<span style="font-size:${Math.round(size*0.55)}px">${av}</span>`;
+function renderKidBar(){
+  const bar = document.getElementById('kidSwitcherGrid');
+  if(!bar) return;
+  bar.innerHTML = state.kids.map(k=>`
+    <div class="kid-chip ${k.id===activeKidId ? 'active':''}" onclick="switchKid('${k.id}')" style="flex:1;">
+      <span class="av">${avatarHtml(k.avatar,34)}</span>
+      <span>${escapeHtml(k.name)}</span>
+    </div>
+  `).join('');
+}
+
+function switchKid(kidId){
+  activeKidId = kidId;
+  render();
+}
+
+function addKidFromForm(){
+  const input = document.getElementById('newKidName');
+  if(input.value.trim()) addKid(input.value.trim());
+  input.value = '';
+}
+
+function deleteKidConfirm(kidId){
+  if(!confirm('Kind wirklich löschen?')) return;
+  state.kids = state.kids.filter(k=>k.id!==kidId);
+  if(activeKidId === kidId) activeKidId = state.kids.length ? state.kids[0].id : null;
+  saveState(); render();
 }
 
 function exportJson(){
@@ -810,123 +643,6 @@ function exportJson(){
   a.download = `family-quest-backup-${todayISO()}.json`;
   a.click();
   URL.revokeObjectURL(url);
-}
-
-function csvEscape(v){
-  const s = String(v ?? '');
-  return /[",\n;]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
-}
-function exportCsv(){
-  const rows = [['Kind','Aktivität','Punkte','Datum']];
-  state.kids.forEach(k=>{
-    k.log.forEach(l=>{
-      rows.push([k.name, l.name, l.pts, l.date || l.when]);
-    });
-  });
-  const csv = rows.map(r=>r.map(csvEscape).join(';')).join('\n');
-  const blob = new Blob(['\uFEFF'+csv], {type:'text/csv;charset=utf-8;'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `family-quest-aktivitaeten-${todayISO()}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
-}
-
-function importJson(file){
-  const reader = new FileReader();
-  reader.onload = (e)=>{
-    let parsed;
-    try{
-      parsed = JSON.parse(e.target.result);
-    }catch(err){
-      alert('Diese Datei ist kein gültiges Backup (kein lesbares JSON).');
-      return;
-    }
-    if(!parsed || !Array.isArray(parsed.kids)){
-      alert('Diese Datei sieht nicht wie ein Family-Quest-Backup aus.');
-      return;
-    }
-    if(!confirm('Backup importieren? Das überschreibt alle aktuellen Daten in diesem Browser.')) return;
-
-    state = {
-      categories: parsed.categories || ['Haushalt','Lernen'],
-      pinnedTaskIds: parsed.pinnedTaskIds || [],
-      tasks: parsed.tasks || [],
-      teams: parsed.teams || [],
-      goodies: parsed.goodies || [],
-      pointRewards: parsed.pointRewards || [
-        {id:'pr1', interval:30, emoji:'📺', text:'Medienzeit (15 Min)'},
-      ],
-      sanctionTypes: parsed.sanctionTypes || [
-        {id:'s1', emoji:'⛔', label:'Aufgabe verweigert', kind:'points', value:10},
-        {id:'s2', emoji:'📴', label:'Bildschirmzeit gesperrt', kind:'lock', value:24},
-        {id:'s3', emoji:'🚫', label:'Goodie gestrichen', kind:'goodie', value:0},
-      ],
-      redemptionRequirements: parsed.redemptionRequirements || [],
-      kids: parsed.kids
-    };
-    state.goodies.forEach(g=>{ if(g.requirementId === undefined) g.requirementId = null; });
-    state.pointRewards.forEach(r=>{ if(r.requirementId === undefined) r.requirementId = null; });
-    state.kids.forEach(k=>{
-      if(!k.log) k.log = [];
-      if(!k.redeemed) k.redeemed = {};
-      if(k.teamId === undefined) k.teamId = null;
-      if(!k.sanctions) k.sanctions = [];
-      if(k.lockedUntil === undefined) k.lockedUntil = null;
-      if(!k.blockedGoodieIds) k.blockedGoodieIds = [];
-      if(!k.redeemedPointRewards) k.redeemedPointRewards = {};
-      if(!k.pointRewardLog) k.pointRewardLog = [];
-    });
-    activeKidId = state.kids.length ? state.kids[0].id : null;
-    saveState(); render();
-    alert('Backup erfolgreich importiert!');
-  };
-  reader.readAsText(file);
-}
-
-function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
-
-function taskCardHtml(t, kid, locked, compact){
-  const otherKids = state.kids.filter(k=>k.id!==kid.id && !isLocked(k));
-  const pinned = state.pinnedTaskIds.includes(t.id);
-  return `
-    <div class="task ${compact?'compact':''}">
-      <button class="pin-btn ${pinned?'pinned':''}" data-toggle-pin="${t.id}" title="${pinned?'Aus Ausschreibung entfernen':'Zur Ausschreibung hinzufügen'}">📌</button>
-      <div class="top"><span class="emoji">${t.emoji}</span><span>${escapeHtml(t.name)}</span></div>
-      <span class="pts">+${t.pts} Punkte</span>
-      <div class="btnrow">
-        <button data-task="${t.id}" ${locked?'disabled title="Gesperrt"':''}>Erledigt ✓</button>
-        ${otherKids.length ? `<button class="team-btn" data-team-toggle="${t.id}" ${locked?'disabled title="Gesperrt"':''}>👥 Team</button>` : ''}
-      </div>
-      ${teamActivityOpenFor===t.id ? `
-      <div class="team-picker">
-        <div class="team-note">+30% Bonus, gleichmäßig geteilt</div>
-        ${otherKids.map(k=>`<label><input type="checkbox" data-team-kid="${k.id}"> ${avatarHtml(k.avatar,16)} ${escapeHtml(k.name)}</label>`).join('')}
-        <button class="confirm-btn" data-team-confirm="${t.id}">Gemeinsam abschließen</button>
-      </div>` : ''}
-    </div>
-  `;
-}
-
-function renderKidBar(){
-  const bar = document.getElementById('kidSwitcherGrid');
-  if(!bar) return;
-  bar.innerHTML = '';
-  state.kids.forEach(k=>{
-    const chip = document.createElement('div');
-    chip.className = 'kid-chip' + (k.id===activeKidId ? ' active':'');
-    chip.innerHTML = `<span class="av">${avatarHtml(k.avatar,34)}</span><span>${escapeHtml(k.name)}</span>`;
-    chip.onclick = ()=>{ activeKidId = k.id; avatarEditorOpenFor=null; render(); };
-    bar.appendChild(chip);
-  });
-  if(!state.kids.length){
-    const hint = document.createElement('div');
-    hint.className = 'empty-small';
-    hint.style.padding = '4px 2px';
-    hint.textContent = 'Noch keine Profile — im Eltern-Modus anlegen.';
-    bar.appendChild(hint);
-  }
 }
 
 function questPathSVG(level){
@@ -955,807 +671,74 @@ function questPathSVG(level){
   </svg>`;
 }
 
-function renderLeaderboard(){
-  const rows = state.kids.map(k=>{
-    const daily = k.log.filter(l=>l.date===todayISO()).reduce((s,l)=>s+l.pts,0);
-    return {k, pts: leaderboardView==='daily' ? daily : k.points};
-  }).sort((a,b)=>b.pts-a.pts);
-
-  const medals = ['🥇','🥈','🥉'];
-  const listHtml = rows.length ? `<ul class="lb-list">
-    ${rows.map((r,i)=>{
-      const team = state.teams.find(t=>t.id===r.k.teamId);
-      return `<li>
-        <span class="rank">${medals[i]||(i+1)}</span>
-        <span class="av">${avatarHtml(r.k.avatar,30)}</span>
-        <span class="name">${escapeHtml(r.k.name)} ${team?`<span class="team-tag">${team.emoji} ${escapeHtml(team.name)}</span>`:''}</span>
-        <span class="pts">${r.pts} P.</span>
-      </li>`;
-    }).join('')}
-  </ul>` : `<div class="empty">Noch keine Kinder angelegt.</div>`;
-
-  let teamHtml = '';
-  if(state.teams.length){
-    const teamRows = state.teams.map(t=>{
-      const members = state.kids.filter(k=>k.teamId===t.id);
-      const pts = members.reduce((s,k)=> s + (leaderboardView==='daily' ? k.log.filter(l=>l.date===todayISO()).reduce((a,l)=>a+l.pts,0) : k.points), 0);
-      return {t, pts, count: members.length};
-    }).sort((a,b)=>b.pts-a.pts);
-    teamHtml = `
-      <div style="margin-top:16px;">
-        <div class="section-title"><h3 style="font-size:1rem;">🚩 Team-Wertung</h3></div>
-        <ul class="lb-list">
-          ${teamRows.map((r,i)=>`<li>
-            <span class="rank">${medals[i]||(i+1)}</span>
-            <span class="av">${r.t.emoji}</span>
-            <span class="name">${escapeHtml(r.t.name)} <span class="team-tag">${r.count} Mitgl.</span></span>
-            <span class="pts">${r.pts} P.</span>
-          </li>`).join('')}
-        </ul>
-      </div>`;
+function avatarHtml(av, size){
+  if(typeof av === 'string' && av.startsWith('data:')){
+    return `<img src="${av}" style="width:100%;height:100%;object-fit:cover;">`;
   }
-
-  return `
-    <div class="card">
-      ${panelHeader('leaderboard', '🏆 Bestenliste')}
-      <div class="${panelBodyClass('leaderboard')}">
-        <div class="leaderboard-toggle">
-          <button class="${leaderboardView==='overall'?'on':''}" data-lb="overall">Gesamt</button>
-          <button class="${leaderboardView==='daily'?'on':''}" data-lb="daily">Heute</button>
-        </div>
-        ${listHtml}
-        ${teamHtml}
-      </div>
-    </div>
-  `;
+  return `<span style="font-size:${Math.round(size*0.55)}px">${av}</span>`;
 }
 
-function renderGlobalHistory(){
-  const all = [];
-  state.kids.forEach(k=>{
-    k.log.forEach(l=> all.push(Object.assign({}, l, {kidId:k.id, kidName:k.name, kidAvatar:k.avatar})));
-  });
-  all.sort((a,b)=> new Date(b.at||b.date) - new Date(a.at||a.date));
-  const top = all.slice(0,25);
-  return `
-    <div class="card">
-      ${panelHeader('history', '📜 Letzte Heldentaten')}
-      <div class="${panelBodyClass('history')}">
-        ${top.length ? `<ul class="log">${top.map(l=>`<li>
-          <span class="row">
-            <span class="who-av">${avatarHtml(l.kidAvatar,22)}</span>
-            ${l.emoji} ${escapeHtml(l.kidName)}: ${escapeHtml(l.name)} (+${l.pts})${l.team && l.team.length ? ` <span class="team-note">👥 mit ${escapeHtml(l.team.join(', '))}</span>` : ''}
-          </span>
-          <span class="when">${displayDateTime(l.at || l.date)}</span>
-          ${parentMode ? `<button class="icon-btn danger" data-delete-log="${l.id}" data-delete-log-kid="${l.kidId}" title="Löschen">🗑️</button>` : ''}
-        </li>`).join('')}</ul>` : '<div class="empty">Noch keine Einträge — leg direkt los!</div>'}
-      </div>
-    </div>
-  `;
-}
-
-function renderPinnedTasks(kid, locked){
-  const items = kid ? state.pinnedTaskIds.map(id=>state.tasks.find(t=>t.id===id)).filter(Boolean) : [];
-  return `
-    <div class="card">
-      ${panelHeader('pinned', '📋 Aktuelle Ausschreibung')}
-      <div class="${panelBodyClass('pinned')}">
-        <div class="taskgrid">
-          ${items.length ? items.map(t=> taskCardHtml(t, kid, locked, true)).join('') : `<div class="empty-small">Nichts ausgeschrieben. Auf 📌 bei einer Aufgabe tippen, um sie hierher zu holen.</div>`}
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function render(){
-  console.log("RENDER");
-
-  const kid = state.kids.find(k=>k.id===activeKidId);
-  document.getElementById('parentToggle').textContent = parentMode ? 'Eltern-Modus verlassen' : 'Eltern-Modus';
-
-  const sidebarLeft = document.getElementById('sidebarLeft');
-  const mainCol = document.getElementById('mainCol');
-  const sidebarRight = document.getElementById('sidebarRight');
-
-  if(!kid){
-    sidebarLeft.innerHTML = `${renderLeaderboard()}
-      <div class="card kid-switcher">
-        ${panelHeader('kidswitch', '👪 Wer bist du?')}
-        <div class="${panelBodyClass('kidswitch')}">
-          <div class="kidgrid" id="kidSwitcherGrid"></div>
-        </div>
-      </div>`;
-    mainCol.innerHTML = `
-      <div class="card empty">Noch kein Kind angelegt.<br>${parentMode ? 'Unten im Eltern-Bereich ein Profil anlegen! 🎉' : 'Eltern-Modus öffnen, um ein Profil anzulegen.'}</div>
-      ${parentMode ? renderParentPanel(null) : ''}
-    `;
-    sidebarRight.innerHTML = renderPinnedTasks(null, true) + renderGlobalHistory();
-    renderKidBar();
-    attachGlobalHandlers();
-    attachPanelToggles();
-    attachParentOnlyHandlers(null);
-    return;
-  }
-
-  const level = levelForPoints(kid.points);
-  const curThresh = thresholdFor(level-1);
-  const nextThresh = thresholdFor(level);
-  const progress = Math.min(100, Math.round(((kid.points-curThresh)/(nextThresh-curThresh))*100));
-
-  const tasksByCat = {};
-  state.categories.forEach(c=> tasksByCat[c] = []);
-  state.tasks.forEach(t=>{ (tasksByCat[t.cat] = tasksByCat[t.cat]||[]).push(t); });
-
-  const maxRewardLevel = Math.max(level+2, 10);
-  let rewardsHtml = '';
-  for(let l=1;l<=maxRewardLevel;l++){
-    const unlocked = level >= l;
-    rewardsHtml += `<div class="reward ${unlocked?'unlocked':'locked'}">
-      <div>${unlocked ? itemFor(l) : '🔒'}</div>
-      <div class="lv">Lvl ${l}</div>
-    </div>`;
-  }
-
-  const locked = isLocked(kid);
-  const availableGoodies = state.goodies.filter(g=>g.level<=level && !kid.redeemed[g.id] && !kid.blockedGoodieIds.includes(g.id));
-  const redeemedGoodies = state.goodies.filter(g=>kid.redeemed[g.id]).sort((a,b)=> new Date(kid.redeemed[b.id]) - new Date(kid.redeemed[a.id]));
-
-  sidebarLeft.innerHTML = `
-    ${renderLeaderboard()}
-
-    <div class="card">
-      ${panelHeader('quest', `${escapeHtml(kid.name)} · Lvl ${level} · ${titleFor(level)}`)}
-      <div class="${panelBodyClass('quest')}">
-        ${questPathSVG(level)}
-        <div class="xpbar"><div class="xpfill" style="width:${progress}%"></div></div>
-        <div class="xplabel">${kid.points} / ${nextThresh} Punkte bis Level ${level+1}</div>
-        <div style="text-align:center;margin-top:10px;">
-          <span class="av-big" id="avatarTrigger" style="display:inline-flex;">${avatarHtml(kid.avatar,48)}</span>
-        </div>
-
-        ${avatarEditorOpenFor===kid.id ? `
-        <div class="avatar-picker">
-          <strong>Avatar wählen:</strong>
-          <div class="avatar-grid">
-            ${AVATAR_CHOICES.map(a=>`<button data-avatar-emoji="${a}">${a}</button>`).join('')}
-          </div>
-          <div>oder eigenes Bild hochladen: <input type="file" accept="image/*" id="avatarFileInput"></div>
-        </div>` : ''}
-      </div>
-    </div>
-
-    <div class="card kid-switcher">
-      ${panelHeader('kidswitch', '👪 Account wechseln')}
-      <div class="${panelBodyClass('kidswitch')}">
-        <div class="kidgrid" id="kidSwitcherGrid"></div>
-      </div>
-    </div>
-  `;
-
-  mainCol.innerHTML = `
-    ${locked ? `<div class="lock-banner">🚫 ${escapeHtml(kid.name)} ist gesperrt bis ${displayDateTime(kid.lockedUntil)}</div>` : ''}
-
-    ${Object.keys(tasksByCat).map(cat=>{
-      const pid = 'cat-'+cat;
-      return `
-      <div class="card">
-        ${panelHeader(pid, `${cat==='Haushalt'?'🧹':cat==='Lernen'?'📚':'✨'} ${escapeHtml(cat)}`)}
-        <div class="${panelBodyClass(pid)}">
-          <div class="taskgrid">
-            ${tasksByCat[cat].length ? tasksByCat[cat].map(t=> taskCardHtml(t, kid, locked, false)).join('') : `<div class="empty-small">Noch keine Aufgaben in dieser Kategorie.</div>`}
-          </div>
-        </div>
-      </div>
-    `;}).join('')}
-
-    <div class="card">
-      ${panelHeader('pointrewards', '💰 Punkte-Belohnungen')}
-      <div class="${panelBodyClass('pointrewards')}">
-        <div class="goodie-list">
-          ${state.pointRewards.length ? state.pointRewards.map(r=>{
-            const count = availablePointRewardCount(kid, r);
-            if(count <= 0) return '';
-            const ok = meetsRequirement(kid, r.requirementId);
-            const req = r.requirementId ? state.redemptionRequirements.find(x=>x.id===r.requirementId) : null;
-            return `
-            <div class="goodie">
-              <span class="emoji">${r.emoji}</span>
-              <span class="txt">${escapeHtml(r.text)}</span>
-              <span class="lvl">je ${r.interval} P. ${count>1?`· x${count} verfügbar`:''}</span>
-              <button data-redeem-points="${r.id}" ${(locked||!ok)?'disabled':''} title="${locked?'Gesperrt':(!ok?'Voraussetzung nicht erfüllt':'')}">Einlösen</button>
-              ${req && !ok ? `<span class="goodie-req">🔒 Voraussetzung: heute ≥${req.minPoints} P. in „${escapeHtml(req.category)}" (bisher ${pointsTodayInCategory(kid, req.category)})</span>` : ''}
-            </div>`;
-          }).join('') : ''}
-          ${state.pointRewards.every(r=>availablePointRewardCount(kid,r)===0) ? `<div class="empty-small">Noch nichts verfügbar — weiter Punkte sammeln!</div>` : ''}
-          ${kid.pointRewardLog.slice(0,6).map(l=>`
-            <div class="goodie redeemed">
-              <span class="emoji">${l.emoji}</span>
-              <span class="txt">${escapeHtml(l.text)}</span>
-              <span class="when">eingelöst ${displayDateTime(l.at)}</span>
-              ${parentMode ? `<button class="icon-btn danger" data-unredeem-points="${l.id}" title="Rückgängig machen">↩️</button>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      ${panelHeader('goodies', '🎁 Goodies einlösen')}
-      <div class="${panelBodyClass('goodies')}">
-        <div class="goodie-list">
-          ${availableGoodies.length ? availableGoodies.map(g=>{
-            const ok = meetsRequirement(kid, g.requirementId);
-            const req = g.requirementId ? state.redemptionRequirements.find(x=>x.id===g.requirementId) : null;
-            return `
-            <div class="goodie">
-              <span class="emoji">${g.emoji}</span>
-              <span class="txt">${escapeHtml(g.text)}</span>
-              <span class="lvl">ab Lvl ${g.level}</span>
-              <button data-redeem="${g.id}" ${(locked||!ok)?'disabled':''} title="${locked?'Gesperrt':(!ok?'Voraussetzung nicht erfüllt':'')}">Einlösen</button>
-              ${req && !ok ? `<span class="goodie-req">🔒 Voraussetzung: heute ≥${req.minPoints} P. in „${escapeHtml(req.category)}" (bisher ${pointsTodayInCategory(kid, req.category)})</span>` : ''}
-            </div>`;
-          }).join('') : `<div class="empty-small">Gerade nichts Neues zum Einlösen — nächstes Level bringt wieder was!</div>`}
-          ${redeemedGoodies.map(g=>`
-            <div class="goodie redeemed">
-              <span class="emoji">${g.emoji}</span>
-              <span class="txt">${escapeHtml(g.text)}</span>
-              <span class="when">eingelöst ${displayDateTime(kid.redeemed[g.id])}</span>
-              ${parentMode ? `<button class="icon-btn danger" data-unredeem-goodie="${g.id}" title="Rückgängig machen">↩️</button>` : ''}
-            </div>
-          `).join('')}
-        </div>
-      </div>
-    </div>
-
-    <div class="card">
-      ${panelHeader('rewards', '🧰 Belohnungstruhe')}
-      <div class="${panelBodyClass('rewards')}">
-        <div class="rewardgrid">${rewardsHtml}</div>
-      </div>
-    </div>
-
-    <div class="card">
-      ${panelHeader('sanctions', '⚠️ Sanktionen')}
-      <div class="${panelBodyClass('sanctions')}">
-        <div class="sanction-list">
-          ${kid.sanctions.length ? kid.sanctions.map(s=>{
-            const expired = s.kind==='lock' && s.expiresAt && new Date(s.expiresAt) <= new Date();
-            return `<div class="sanction ${expired?'expired':''}">
-              <span class="emoji">${s.emoji}</span>
-              <span class="txt">${escapeHtml(s.label)}${s.note?` — ${escapeHtml(s.note)}`:''}</span>
-              <span class="meta">
-                ${s.kind==='points' ? `−${s.value} P.` : ''}
-                ${s.kind==='lock' ? (expired ? 'abgelaufen' : `bis ${displayDateTime(s.expiresAt)}`) : ''}
-                · ${displayDateTime(s.appliedAt)}
-              </span>
-              ${parentMode ? `<button class="icon-btn danger" data-remove-sanction="${s.id}" title="Zurücknehmen">↩️</button>` : ''}
-            </div>`;
-          }).join('') : `<div class="empty-small">Bisher keine Sanktionen — bleibt hoffentlich so! 😉</div>`}
-        </div>
-      </div>
-    </div>
-
-    ${parentMode ? renderParentPanel(kid) : ''}
-  `;
-
-  sidebarRight.innerHTML = `
-    ${renderPinnedTasks(kid, locked)}
-    ${renderGlobalHistory()}
-  `;
-
-  renderKidBar();
-  attachGlobalHandlers();
-  attachPanelToggles();
-  attachKidHandlers(kid);
-}
-
-function renderParentPanel(kid){
-  const teamOptions = kid ? ['<option value="">Kein Team</option>'].concat(
-    state.teams.map(t=>`<option value="${t.id}" ${kid.teamId===t.id?'selected':''}>${t.emoji} ${escapeHtml(t.name)}</option>`)
-  ).join('') : '';
-
-  const requirementOptions = (selectedId)=> ['<option value="">Keine Voraussetzung</option>'].concat(
-    state.redemptionRequirements.map(r=>`<option value="${r.id}" ${selectedId===r.id?'selected':''}>${escapeHtml(r.label)} (≥${r.minPoints} P. ${escapeHtml(r.category)})</option>`)
-  ).join('');
-
-  return `
-  <div class="card">
-    ${panelHeader('parent', '⚙️ Eltern-Bereich')}
-    <div class="${panelBodyClass('parent')}">
-
-    <div class="parent-block" style="margin-top:0;padding-top:0;border-top:none;">
-      <h4>👶 Kind / Profil anlegen</h4>
-      <div class="addform">
-        <input type="text" id="newKidName" placeholder="Name des Kindes" class="grow">
-        <button id="addKidBtn">Profil anlegen</button>
-      </div>
-      ${state.kids.length ? `<div class="empty-small" style="margin-top:6px;">Vorhandene Profile: ${state.kids.map(k=>escapeHtml(k.name)).join(', ')}</div>` : ''}
-    </div>
-
-    <div class="parent-block">
-      <h4>💾 Daten sichern &amp; übertragen</h4>
-      <div class="addform">
-        <button id="exportJsonBtn" type="button">⬇️ Backup (JSON)</button>
-        <button id="exportCsvBtn" type="button">⬇️ Aktivitäten (CSV)</button>
-        <button id="importJsonBtn" type="button">⬆️ Backup importieren</button>
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>➕ Neue Aufgabe</h4>
-      <div class="addform">
-        <input type="text" id="newTaskName" placeholder="Aufgabenname">
-        <input type="text" id="newTaskEmoji" placeholder="Emoji" style="width:60px;">
-        <select id="newTaskCat">
-          ${state.categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
-        </select>
-        <input type="number" id="newTaskPts" placeholder="Punkte" value="10">
-        <button id="addTaskBtn">Hinzufügen</button>
-      </div>
-      <div class="mini-list">
-        ${state.tasks.map(t=>`
-          <div class="row">
-            <input type="text" value="${escapeHtml(t.emoji)}" style="width:50px;" data-edit-task-field="emoji" data-edit-task-id="${t.id}">
-            <input type="text" class="grow" value="${escapeHtml(t.name)}" data-edit-task-field="name" data-edit-task-id="${t.id}">
-            <input type="number" value="${t.pts}" style="width:70px;" data-edit-task-field="pts" data-edit-task-id="${t.id}">
-            <select data-move-task="${t.id}">
-              ${state.categories.map(c=>`<option value="${escapeHtml(c)}" ${t.cat===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
-            </select>
-            <button class="icon-btn danger" data-delete-task="${t.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Aufgaben angelegt.</div>'}
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>🗂️ Neue Kategorie</h4>
-      <div class="addform">
-        <input type="text" id="newCatName" placeholder="z.B. Sport, Garten...">
-        <button id="addCatBtn">Kategorie hinzufügen</button>
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>🔐 Einlöse-Voraussetzungen verwalten</h4>
-      <div class="empty-small" style="margin-bottom:8px;">Legt Regeln fest wie „heute mind. X Punkte in Kategorie Y" — verknüpfbar mit beliebigen Belohnungen unten.</div>
-      <div class="addform">
-        <input type="text" id="newReqLabel" placeholder="Bezeichnung, z.B. 'Hausaufgaben zuerst'" class="grow">
-        <select id="newReqCategory">
-          ${state.categories.map(c=>`<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join('')}
-        </select>
-        <input type="number" id="newReqMinPoints" placeholder="Min. Punkte heute" style="width:130px;" value="10">
-        <button id="addReqBtn">Anlegen</button>
-      </div>
-      <div class="mini-list">
-        ${state.redemptionRequirements.map(r=>`
-          <div class="row">
-            <input type="text" class="grow" value="${escapeHtml(r.label)}" data-edit-req-field="label" data-edit-req-id="${r.id}">
-            <select data-edit-req-field="category" data-edit-req-id="${r.id}">
-              ${state.categories.map(c=>`<option value="${escapeHtml(c)}" ${r.category===c?'selected':''}>${escapeHtml(c)}</option>`).join('')}
-            </select>
-            <input type="number" value="${r.minPoints}" style="width:90px;" data-edit-req-field="minPoints" data-edit-req-id="${r.id}">
-            <button class="icon-btn danger" data-delete-req="${r.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Voraussetzungen angelegt.</div>'}
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>💰 Punkte-Belohnungen verwalten</h4>
-      <div class="addform">
-        <input type="number" id="newPointRewardInterval" placeholder="alle X Punkte" style="width:110px;" value="30">
-        <input type="text" id="newPointRewardEmoji" placeholder="Emoji" style="width:60px;">
-        <input type="text" id="newPointRewardText" placeholder="z.B. Medienzeit (15 Min)">
-        <select id="newPointRewardReq">${requirementOptions(null)}</select>
-        <button id="addPointRewardBtn">Hinzufügen</button>
-      </div>
-      <div class="mini-list">
-        ${state.pointRewards.map(r=>`
-          <div class="row">
-            <input type="number" value="${r.interval}" style="width:80px;" data-edit-pr-field="interval" data-edit-pr-id="${r.id}">
-            <input type="text" value="${escapeHtml(r.emoji)}" style="width:50px;" data-edit-pr-field="emoji" data-edit-pr-id="${r.id}">
-            <input type="text" class="grow" value="${escapeHtml(r.text)}" data-edit-pr-field="text" data-edit-pr-id="${r.id}">
-            <select data-edit-pr-field="requirementId" data-edit-pr-id="${r.id}">${requirementOptions(r.requirementId)}</select>
-            <button class="icon-btn danger" data-delete-point-reward="${r.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Punkte-Belohnungen angelegt.</div>'}
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>🎁 Goodies verwalten</h4>
-      <div class="addform">
-        <input type="number" id="newGoodieLevel" placeholder="ab Level" style="width:90px;" value="1">
-        <input type="text" id="newGoodieEmoji" placeholder="Emoji" style="width:60px;">
-        <input type="text" id="newGoodieText" placeholder="z.B. 15 Min zocken">
-        <select id="newGoodieReq">${requirementOptions(null)}</select>
-        <button id="addGoodieBtn">Hinzufügen</button>
-      </div>
-      <div class="mini-list">
-        ${state.goodies.sort((a,b)=>a.level-b.level).map(g=>`
-          <div class="row">
-            <input type="number" value="${g.level}" style="width:70px;" data-edit-goodie-field="level" data-edit-goodie-id="${g.id}">
-            <input type="text" value="${escapeHtml(g.emoji)}" style="width:50px;" data-edit-goodie-field="emoji" data-edit-goodie-id="${g.id}">
-            <input type="text" class="grow" value="${escapeHtml(g.text)}" data-edit-goodie-field="text" data-edit-goodie-id="${g.id}">
-            <select data-edit-goodie-field="requirementId" data-edit-goodie-id="${g.id}">${requirementOptions(g.requirementId)}</select>
-            <button class="icon-btn danger" data-delete-goodie="${g.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Goodies angelegt.</div>'}
-      </div>
-    </div>
-
-    <div class="parent-block">
-      <h4>🚩 Teams verwalten</h4>
-      <div class="addform">
-        <input type="text" id="newTeamName" placeholder="Teamname">
-        <input type="text" id="newTeamEmoji" placeholder="Emoji" style="width:60px;">
-        <button id="addTeamBtn">Team erstellen</button>
-      </div>
-      <div class="mini-list">
-        ${state.teams.map(t=>`
-          <div class="row">
-            <input type="text" value="${escapeHtml(t.emoji)}" style="width:50px;" data-edit-team-field="emoji" data-edit-team-id="${t.id}">
-            <input type="text" class="grow" value="${escapeHtml(t.name)}" data-edit-team-field="name" data-edit-team-id="${t.id}">
-            <button class="icon-btn danger" data-delete-team="${t.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Teams angelegt.</div>'}
-      </div>
-      ${kid ? `<div style="margin-top:10px;font-weight:700;font-size:.85rem;">Team von ${escapeHtml(kid.name)}:
-        <select id="kidTeamSelect">${teamOptions}</select>
-      </div>` : ''}
-    </div>
-
-    <div class="parent-block">
-      <h4>⚠️ Sanktionsarten verwalten</h4>
-      <div class="addform">
-        <input type="text" id="newSanctionEmoji" placeholder="Emoji" style="width:60px;">
-        <input type="text" id="newSanctionLabel" placeholder="Bezeichnung, z.B. 'Nicht mitgemacht'">
-        <select id="newSanctionKind">
-          <option value="points">Punktabzug</option>
-          <option value="lock">Temporäre Sperre</option>
-          <option value="goodie">Goodie entziehen</option>
-        </select>
-        <input type="number" id="newSanctionValue" placeholder="Punkte / Stunden" style="width:120px;" value="10">
-        <button id="addSanctionTypeBtn">Anlegen</button>
-      </div>
-      <div class="mini-list">
-        ${state.sanctionTypes.map(s=>`
-          <div class="row">
-            <input type="text" value="${escapeHtml(s.emoji)}" style="width:50px;" data-edit-st-field="emoji" data-edit-st-id="${s.id}">
-            <input type="text" class="grow" value="${escapeHtml(s.label)}" data-edit-st-field="label" data-edit-st-id="${s.id}">
-            <select data-edit-st-field="kind" data-edit-st-id="${s.id}">
-              <option value="points" ${s.kind==='points'?'selected':''}>Punktabzug</option>
-              <option value="lock" ${s.kind==='lock'?'selected':''}>Temporäre Sperre</option>
-              <option value="goodie" ${s.kind==='goodie'?'selected':''}>Goodie entziehen</option>
-            </select>
-            ${s.kind!=='goodie' ? `<input type="number" value="${s.value}" style="width:90px;" data-edit-st-field="value" data-edit-st-id="${s.id}" title="${s.kind==='points'?'Punkte':'Stunden'}">` : ''}
-            <button class="icon-btn danger" data-delete-sanction-type="${s.id}">🗑️</button>
-          </div>
-        `).join('') || '<div class="empty-small">Noch keine Sanktionsarten angelegt.</div>'}
-      </div>
-
-      ${kid ? `
-      <h4 style="margin-top:14px;">🚨 Sanktion anwenden auf ${escapeHtml(kid.name)}</h4>
-      <div class="addform">
-        <select id="applySanctionType">
-          ${state.sanctionTypes.map(s=>`<option value="${s.id}">${s.emoji} ${escapeHtml(s.label)}</option>`).join('')}
-        </select>
-        <select id="applySanctionGoodie" style="display:none;">
-          ${state.goodies.map(g=>`<option value="${g.id}">${g.emoji} ${escapeHtml(g.text)}</option>`).join('')}
-        </select>
-        <input type="text" id="applySanctionNote" placeholder="Notiz (optional)">
-        <button id="applySanctionBtn">Anwenden</button>
-      </div>` : ''}
-    </div>
-    </div>
-  </div>
-  `;
-}
-
-function attachGlobalHandlers(){
-  document.querySelectorAll('button[data-lb]').forEach(btn=>{
-    btn.onclick = ()=>{ leaderboardView = btn.dataset.lb; render(); };
-  });
-}
-
-function attachKidHandlers(kid){
-  const content = document;
-
-  content.querySelectorAll('button[data-task]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const task = state.tasks.find(t=>t.id===btn.dataset.task);
-      completeTask(kid, task);
-    };
+function attachEventListeners(kid){
+  document.querySelectorAll('[data-toggle-pin]').forEach(btn=>{
+    btn.onclick = (e)=>{ e.stopPropagation(); togglePin(btn.dataset.togglePin); };
   });
 
-  content.querySelectorAll('button[data-redeem]').forEach(btn=>{
-    btn.onclick = ()=> redeemGoodie(kid, btn.dataset.redeem);
-  });
-  content.querySelectorAll('button[data-redeem-points]').forEach(btn=>{
-    btn.onclick = ()=> redeemPointReward(kid, btn.dataset.redeemPoints);
-  });
-  content.querySelectorAll('button[data-unredeem-goodie]').forEach(btn=>{
-    btn.onclick = ()=> unredeemGoodie(kid, btn.dataset.unredeemGoodie);
-  });
-  content.querySelectorAll('button[data-unredeem-points]').forEach(btn=>{
-    btn.onclick = ()=> unredeemPointReward(kid, btn.dataset.unredeemPoints);
-  });
-
-  content.querySelectorAll('button[data-team-toggle]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const taskId = btn.dataset.teamToggle;
-      teamActivityOpenFor = (teamActivityOpenFor === taskId) ? null : taskId;
-      render();
-    };
-  });
-  content.querySelectorAll('button[data-team-confirm]').forEach(btn=>{
-    btn.onclick = ()=>{
-      const taskId = btn.dataset.teamConfirm;
+  document.querySelectorAll('[data-task]').forEach(btn=>{
+    btn.onclick = ()=>{ 
+      const taskId = btn.dataset.task;
       const task = state.tasks.find(t=>t.id===taskId);
-      const checked = Array.from(content.querySelectorAll('input[data-team-kid]:checked')).map(cb=>cb.dataset.teamKid);
-      if(!checked.length){ alert('Bitte mindestens ein weiteres Kind auswählen — oder normal auf „Erledigt" tippen.'); return; }
-      completeTaskTeam(kid, task, checked);
+      if(task && kid) completeTask(kid, task);
     };
   });
 
-  content.querySelectorAll('button[data-toggle-pin]').forEach(btn=>{
-    btn.onclick = ()=> togglePin(btn.dataset.togglePin);
-  });
-
-  content.querySelectorAll('button[data-delete-log]').forEach(btn=>{
+  document.querySelectorAll('[data-redeem]').forEach(btn=>{
     btn.onclick = ()=>{
-      const targetKid = state.kids.find(k=>k.id===btn.dataset.deleteLogKid) || kid;
-      deleteLogEntry(targetKid, btn.dataset.deleteLog);
+      if(!kid) return;
+      const goodieId = btn.dataset.redeem;
+      kid.redeemed[goodieId] = new Date().toISOString();
+      saveState(); render();
     };
   });
-
-  const avTrigger = document.getElementById('avatarTrigger');
-  if(avTrigger){
-    avTrigger.onclick = ()=>{ avatarEditorOpenFor = (avatarEditorOpenFor===kid.id) ? null : kid.id; render(); };
-  }
-  content.querySelectorAll('button[data-avatar-emoji]').forEach(btn=>{
-    btn.onclick = ()=> setAvatarEmoji(kid, btn.dataset.avatarEmoji);
-  });
-  const avFile = document.getElementById('avatarFileInput');
-  if(avFile){
-    avFile.onchange = (e)=>{ if(e.target.files[0]) setAvatarFile(kid, e.target.files[0]); };
-  }
-
-  if(parentMode){
-    attachParentOnlyHandlers(kid);
-  }
-}
-
-function attachParentOnlyHandlers(kid){
-  const content = document;
-
-  const addKidBtn = document.getElementById('addKidBtn');
-  if(addKidBtn) addKidBtn.onclick = ()=>{
-    const nameInput = document.getElementById('newKidName');
-    const name = nameInput.value.trim();
-    if(name) addKid(name);
-  };
-
-  const exportJsonBtn = document.getElementById('exportJsonBtn');
-  if(exportJsonBtn) exportJsonBtn.onclick = exportJson;
-  const exportCsvBtn = document.getElementById('exportCsvBtn');
-  if(exportCsvBtn) exportCsvBtn.onclick = exportCsv;
-  const importJsonBtn = document.getElementById('importJsonBtn');
-  if(importJsonBtn) importJsonBtn.onclick = ()=> document.getElementById('importJsonInput').click();
-
-  const addBtn = document.getElementById('addTaskBtn');
-  if(addBtn) addBtn.onclick = ()=>{
-    const name = document.getElementById('newTaskName').value.trim();
-    const emoji = document.getElementById('newTaskEmoji').value.trim();
-    const cat = document.getElementById('newTaskCat').value;
-    const pts = parseInt(document.getElementById('newTaskPts').value) || 10;
-    if(name) addCustomTask(cat, name, emoji, pts);
-  };
-  content.querySelectorAll('button[data-delete-task]').forEach(btn=>{
-    btn.onclick = ()=> deleteTask(btn.dataset.deleteTask);
-  });
-  content.querySelectorAll('select[data-move-task]').forEach(sel=>{
-    sel.onchange = (e)=> moveTaskCategory(sel.dataset.moveTask, e.target.value);
-  });
-  content.querySelectorAll('[data-edit-task-field]').forEach(el=>{
-    el.onchange = (e)=> updateTaskField(el.dataset.editTaskId, el.dataset.editTaskField, e.target.value);
-  });
-
-  const addCatBtn = document.getElementById('addCatBtn');
-  if(addCatBtn) addCatBtn.onclick = ()=>{
-    const name = document.getElementById('newCatName').value.trim();
-    if(name) addCategory(name);
-  };
-
-  const addReqBtn = document.getElementById('addReqBtn');
-  if(addReqBtn) addReqBtn.onclick = ()=>{
-    const label = document.getElementById('newReqLabel').value.trim();
-    const category = document.getElementById('newReqCategory').value;
-    const minPoints = parseInt(document.getElementById('newReqMinPoints').value) || 0;
-    if(label) addRedemptionRequirement(label, category, minPoints);
-  };
-  content.querySelectorAll('button[data-delete-req]').forEach(btn=>{
-    btn.onclick = ()=> deleteRedemptionRequirement(btn.dataset.deleteReq);
-  });
-  content.querySelectorAll('[data-edit-req-field]').forEach(el=>{
-    el.onchange = (e)=> updateRequirementField(el.dataset.editReqId, el.dataset.editReqField, e.target.value);
-  });
-
-  const addPointRewardBtn = document.getElementById('addPointRewardBtn');
-  if(addPointRewardBtn) addPointRewardBtn.onclick = ()=>{
-    const interval = parseInt(document.getElementById('newPointRewardInterval').value) || 30;
-    const emoji = document.getElementById('newPointRewardEmoji').value.trim();
-    const text = document.getElementById('newPointRewardText').value.trim();
-    const requirementId = document.getElementById('newPointRewardReq').value;
-    if(text) addPointReward(interval, emoji, text, requirementId);
-  };
-  content.querySelectorAll('button[data-delete-point-reward]').forEach(btn=>{
-    btn.onclick = ()=> deletePointReward(btn.dataset.deletePointReward);
-  });
-  content.querySelectorAll('[data-edit-pr-field]').forEach(el=>{
-    el.onchange = (e)=> updatePointRewardField(el.dataset.editPrId, el.dataset.editPrField, e.target.value);
-  });
-
-  const addGoodieBtn = document.getElementById('addGoodieBtn');
-  if(addGoodieBtn) addGoodieBtn.onclick = ()=>{
-    const level = parseInt(document.getElementById('newGoodieLevel').value) || 1;
-    const emoji = document.getElementById('newGoodieEmoji').value.trim();
-    const text = document.getElementById('newGoodieText').value.trim();
-    const requirementId = document.getElementById('newGoodieReq').value;
-    if(text) addGoodie(level, emoji, text, requirementId);
-  };
-  content.querySelectorAll('button[data-delete-goodie]').forEach(btn=>{
-    btn.onclick = ()=> deleteGoodie(btn.dataset.deleteGoodie);
-  });
-  content.querySelectorAll('[data-edit-goodie-field]').forEach(el=>{
-    el.onchange = (e)=> updateGoodieField(el.dataset.editGoodieId, el.dataset.editGoodieField, e.target.value);
-  });
-
-  const addTeamBtn = document.getElementById('addTeamBtn');
-  if(addTeamBtn) addTeamBtn.onclick = ()=>{
-    const name = document.getElementById('newTeamName').value.trim();
-    const emoji = document.getElementById('newTeamEmoji').value.trim();
-    if(name) addTeam(name, emoji);
-  };
-  content.querySelectorAll('button[data-delete-team]').forEach(btn=>{
-    btn.onclick = ()=> deleteTeam(btn.dataset.deleteTeam);
-  });
-  content.querySelectorAll('[data-edit-team-field]').forEach(el=>{
-    el.onchange = (e)=> updateTeamField(el.dataset.editTeamId, el.dataset.editTeamField, e.target.value);
-  });
-
-  if(kid){
-    const kidTeamSelect = document.getElementById('kidTeamSelect');
-    if(kidTeamSelect) kidTeamSelect.onchange = (e)=> setKidTeam(kid, e.target.value);
-  }
-
-  const addSanctionTypeBtn = document.getElementById('addSanctionTypeBtn');
-  if(addSanctionTypeBtn) addSanctionTypeBtn.onclick = ()=>{
-    const emoji = document.getElementById('newSanctionEmoji').value.trim();
-    const label = document.getElementById('newSanctionLabel').value.trim();
-    const kind = document.getElementById('newSanctionKind').value;
-    const value = parseInt(document.getElementById('newSanctionValue').value) || 0;
-    if(label) addSanctionType(emoji, label, kind, value);
-  };
-  content.querySelectorAll('button[data-delete-sanction-type]').forEach(btn=>{
-    btn.onclick = ()=> deleteSanctionType(btn.dataset.deleteSanctionType);
-  });
-  content.querySelectorAll('[data-edit-st-field]').forEach(el=>{
-    el.onchange = (e)=> updateSanctionTypeField(el.dataset.editStId, el.dataset.editStField, e.target.value);
-  });
-
-  if(kid){
-    const applyTypeSelect = document.getElementById('applySanctionType');
-    const applyGoodieSelect = document.getElementById('applySanctionGoodie');
-    if(applyTypeSelect && applyGoodieSelect){
-      const syncGoodieVisibility = ()=>{
-        const st = state.sanctionTypes.find(s=>s.id===applyTypeSelect.value);
-        applyGoodieSelect.style.display = (st && st.kind==='goodie') ? '' : 'none';
-      };
-      applyTypeSelect.onchange = syncGoodieVisibility;
-      syncGoodieVisibility();
-    }
-    const applySanctionBtn = document.getElementById('applySanctionBtn');
-    if(applySanctionBtn) applySanctionBtn.onclick = ()=>{
-      const typeId = applyTypeSelect.value;
-      const note = document.getElementById('applySanctionNote').value.trim();
-      const st = state.sanctionTypes.find(s=>s.id===typeId);
-      const goodieId = (st && st.kind==='goodie') ? applyGoodieSelect.value : null;
-      applySanction(kid, typeId, note, goodieId);
-    };
-
-    content.querySelectorAll('button[data-remove-sanction]').forEach(btn=>{
-      btn.onclick = ()=> removeSanction(kid, btn.dataset.removeSanction);
-    });
-  }
-}
-
-function openPasswordModal(){
-  const modal = document.getElementById('pwModal');
-  const input = document.getElementById('pwInput');
-  const error = document.getElementById('pwError');
-  error.style.display = 'none';
-  input.value = '';
-  modal.style.display = 'flex';
-  setTimeout(()=> input.focus(), 50);
-}
-function closePasswordModal(){
-  document.getElementById('pwModal').style.display = 'none';
-}
-function submitPassword(){
-  const input = document.getElementById('pwInput');
-  const error = document.getElementById('pwError');
-  if(input.value === PARENT_PASSWORD){
-    closePasswordModal();
-    parentMode = true;
-    render();
-  } else {
-    error.style.display = 'block';
-    input.value = '';
-    input.focus();
-  }
 }
 
 document.getElementById('parentToggle').onclick = ()=>{
-  if(!parentMode){
-    openPasswordModal();
-  } else {
+  if(parentMode){
     parentMode = false;
-    render();
-  }
-};
-document.getElementById('pwCancel').onclick = closePasswordModal;
-document.getElementById('pwSubmit').onclick = submitPassword;
-document.getElementById('pwInput').addEventListener('keydown', (e)=>{
-  if(e.key === 'Enter') submitPassword();
-});
-document.getElementById('importJsonInput').onchange = (e)=>{
-  if(e.target.files[0]) importJson(e.target.files[0]);
-  e.target.value = '';
-};
-function startRealtimeSync(){
-
-supabase
-  .channel('family-quest-sync')
-
-  .on(
-    'postgres_changes',
-    {
-      event: '*',
-      schema: 'public',
-      table: 'app_state'
-    },
-    payload => {
-
-      if(suppressRealtimeUpdate){
-        return;
-      }
-
-      if(
-        payload.new &&
-        payload.new.id === APP_STATE_ID
-      ){
-
-        state = payload.new.state;
-
-        render();
-      }
-
+    if(state.kids.length) activeKidId = state.kids[0].id;
+  } else {
+    const pw = prompt('Eltern-Passwort:');
+    if(pw === PARENT_PASSWORD){
+      parentMode = true;
+    } else if(pw !== null){
+      alert('Falsches Passwort.');
     }
-  )
-  .subscribe();
+  }
+  render();
+};
 
+document.getElementById('importJsonInput').onchange = (e)=>{
+  const file = e.target.files[0];
+  if(file) importJson(file);
+};
+
+function importJson(file){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    try{
+      const parsed = JSON.parse(e.target.result);
+      if(!parsed || !Array.isArray(parsed.kids)) throw new Error('Invalid format');
+      state = parsed;
+      activeKidId = state.kids.length ? state.kids[0].id : null;
+      saveState(); render();
+      alert('Importiert!');
+    }catch(err){
+      alert('Import fehlgeschlagen: ' + err.message);
+    }
+  };
+  reader.readAsText(file);
 }
 
-(async () => {
-
-  loadState();
-
-  render();
-
-})();
-
+loadState();
 </script>
 </body>
 </html>

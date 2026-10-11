@@ -395,9 +395,10 @@ try {
     .single();
 
   if (error) {
-    console.error(error);
-    return false;
-  }
+  console.error("Cloud Fehler:", error);
+  return true;
+}
+
 
   if (data && data.state) {
 

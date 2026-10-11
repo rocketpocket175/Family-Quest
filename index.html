@@ -1049,6 +1049,8 @@ function renderPinnedTasks(kid, locked){
 }
 
 function render(){
+  console.log("RENDER");
+
   const kid = state.kids.find(k=>k.id===activeKidId);
   document.getElementById('parentToggle').textContent = parentMode ? 'Eltern-Modus verlassen' : 'Eltern-Modus';
 

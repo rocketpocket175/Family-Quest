@@ -1747,15 +1747,9 @@ supabase
 ``
 (async () => {
 
-await loadParentPassword();
+  loadState();
 
-loadState();
-
-await loadFromCloud();
-
-render();
-
-startRealtimeSync();
+  render();
 
 })();
 
